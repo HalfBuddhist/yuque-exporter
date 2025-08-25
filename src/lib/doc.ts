@@ -11,8 +11,18 @@ import { readJSON, download, getRedirectLink } from './utils.js';
 import { config } from '../config.js';
 
 const { host, metaDir, outputDir, userAgent } = config;
-const docsPublishedAtPath = await fg('**/docs-published-at.json', { cwd: metaDir, deep: 3 });
-const docsPublishedAtMap = await readJSON(path.join(metaDir, docsPublishedAtPath[0]));
+
+// 检查 metaDir 是否存在，如果不存在则创建空的 docsPublishedAtMap
+let docsPublishedAtMap = {};
+try {
+  const docsPublishedAtPath = await fg('**/docs-published-at.json', { cwd: metaDir, deep: 3 });
+  if (docsPublishedAtPath.length > 0) {
+    docsPublishedAtMap = await readJSON(path.join(metaDir, docsPublishedAtPath[0]));
+  }
+} catch (error) {
+  // metaDir 不存在时忽略错误，使用空对象
+  console.warn(`Warning: Could not read docs-published-at.json, using empty map`);
+}
 
 interface Options {
   doc: TreeNode;
@@ -20,25 +30,30 @@ interface Options {
 }
 
 export async function buildDoc(doc: TreeNode, mapping: Record<string, TreeNode>) {
-  const docDetail = await readJSON(path.join(metaDir, doc.namespace, 'docs', `${doc.url}.json`));
-  if (typeof docsPublishedAtMap[docDetail.id] !== 'undefined' && docsPublishedAtMap[docDetail.id] === docDetail.published_at) {
+  try {
+    const docDetail = await readJSON(path.join(metaDir, doc.namespace, 'docs', `${doc.url}.json`));
+    if (typeof docsPublishedAtMap[docDetail.id] !== 'undefined' && docsPublishedAtMap[docDetail.id] === docDetail.published_at) {
+      return null;
+    }
+    const content = await remark()
+      .data('settings', { bullet: '-', listItemIndent: 'one' })
+      .use([
+        [replaceHTML],
+        [relativeLink, { doc, mapping }],
+        [downloadAsset, { doc, mapping }],
+      ])
+      .process(docDetail.body);
+
+    doc.content = frontmatter(doc) + content.toString();
+
+    // FIXME: remark will transform `*` to `\*`
+    doc.content = doc.content.replaceAll('\\*', '*');
+
+    return doc;
+  } catch (error) {
+    console.warn(`Warning: Failed to build doc ${doc.namespace}/${doc.url}: ${error.message}`);
     return null;
   }
-  const content = await remark()
-    .data('settings', { bullet: '-', listItemIndent: 'one' })
-    .use([
-      [ replaceHTML ],
-      [ relativeLink, { doc, mapping }],
-      [ downloadAsset, { doc, mapping }],
-    ])
-    .process(docDetail.body);
-
-  doc.content = frontmatter(doc) + content.toString();
-
-  // FIXME: remark will transform `*` to `\*`
-  doc.content = doc.content.replaceAll('\\*', '*');
-
-  return doc;
 }
 
 function frontmatter(doc) {

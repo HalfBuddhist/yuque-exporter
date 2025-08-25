@@ -16,12 +16,12 @@ export async function crawl(inputs?: string[]) {
   if (clean) await rm(metaDir);
 
   // if inputs is empty, crawl all repos of the user which associated with the token
-  if (!inputs || inputs.length === 0) inputs = [ '' ];
+  if (!inputs || inputs.length === 0) inputs = [''];
 
   // find target repos
   const repoList = new Set<string>();
   for (const input of inputs) {
-    const [ user, repo, extra ] = input.split('/');
+    const [user, repo, extra] = input.split('/');
     if (extra) {
       logger.warn(`invalid url paths: ${input}`);
       continue;
@@ -43,7 +43,7 @@ export async function crawl(inputs?: string[]) {
       }
     }
   }
-  logger.info(`Find repos to crawl: ${[ '', ...repoList ].join('\n  - ')}\n`);
+  logger.info(`Find repos to crawl: ${['', ...repoList].join('\n  - ')}\n`);
 
   // crawl repos
   for (const namespace of repoList) {
@@ -63,7 +63,7 @@ export async function crawlRepo(namespace: string) {
   await saveToStorage(`${namespace}/toc.json`, toc);
   await saveToStorage(`${namespace}/docs.json`, docList);
   await saveToStorage(`${namespace}/docs-published-at.json`, Object.fromEntries(
-    [ ...docList.entries() ].map(([ index, doc ]) => [ doc.id, doc.published_at ]),
+    [...docList.entries()].map(([index, doc]) => [doc.id, doc.published_at]),
   ));
 
   // crawl repo docs
